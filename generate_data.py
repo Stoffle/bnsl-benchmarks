@@ -16,13 +16,14 @@ def generate_data(dag: DAG, n:int, filename_prefix: str) -> None:
 
 if __name__ == "__main__":
     sachs_dag = DAG.from_bif("sachs")
+    child_dag = DAG.from_bif("child")
     ff15_dag = DAG.generate("forest fire", 15, seed=0).generate_discrete_parameters(seed=0)
     print(f"ff15 modelstring: {ff15_dag.get_modelstring()}")
     p = Path().resolve() / "data"
     p.mkdir(exist_ok=True)
-    for n in [1_000, 10_000, 100_000]:
+    for n in [1_000, 10_000, 100_000, 1_000_000]:
         n_dir = p / f"{n/1000:.0f}k"
         n_dir.mkdir(exist_ok=False)
         generate_data(sachs_dag, n, f"{n_dir}/sachs")
-
+        generate_data(child_dag, n, f"{n_dir}/child")
         generate_data(ff15_dag, n, f"{n_dir}/forest_fire_15")
