@@ -6,7 +6,6 @@ from tqdm import tqdm
 
 import pybnsl
 from baynet import DAG, metrics
-from baynet.structure import _name_node
 from generate_data import generate_data
 
 
@@ -39,39 +38,38 @@ def linear_dist_dag(d: int, max_parents: int, seed:int) -> DAG:
     for var in range(d):
         if in_degree == 0: continue
         parents = gen.choice(np.arange(var+1, d), in_degree, replace=False)
-        print(parents)
         amat[var][parents] = 1
         in_degree -= 1
     amat = amat.T
-    print(amat)
     # node_names = [_name_node(i) for i in range(d)]
-    return DAG.from_amat(amat)
+    return DAG.from_amat(amat).generate_discrete_parameters(max_levels=2, seed=seed)
 
 if __name__=='__main__':
-    # d = DAG.from_bif("sachs")
-    dags = []
-    in_degrees = []
-    sample_sizes = [2000]
-    learnt_neighbours = []
-    # for n in tqdm(sample_sizes):
-    #     for d in tqdm(range(10, 15)):
-    #         for seed in tqdm(range(15), leave=False):
-    #             dag = DAG.generate("forest fire", 13, fw_prob=0.5, bw_factor=0.5, seed=seed).generate_discrete_parameters(seed=seed)
-    #             dags.append(dag)
-    #             in_degrees.append(dag.get_node(0).indegree())
-    #             learnt = sl_on_dag(dag, n, seed)
-    #             learnt_neighbours.append(len(learnt.get_node(0).neighbors()))
-    # d = DAG.generate("ide_cozman", 15, seed=seed).generate_discrete_parameters(seed=seed)
-    # print(f"nodes = {len(dag.nodes)}")
-    # print(f"edges = {len(dag.edges)}")
-    # print(f"node A in-degree = {dag.indegree()[0]}")
-    # learnt = sl_on_dag(d, 3000, seed)
-    # d.compare(learnt).plot()
-    # print(f"v-structure recall = {metrics.v_recall(d, learnt)}")
+    true_indegrees = np.arange(1, 11)
+    sample_sizes = np.logspace(1, 3, num=5, endpoint=True).astype(int)
+    # sample_sizes = [500, 1000]
+    for n in tqdm(sample_sizes):
+        learnt_degree_means = []
+        learnt_degree_upperq = []
+        learnt_degree_lowerq = []
+        for in_deg in tqdm(true_indegrees, leave=False):
+            inner_learnt_degrees = []
+            for seed in tqdm(range(10), leave=False):
+                dag = linear_dist_dag(in_deg+5, in_deg, seed=seed)
+                learnt = sl_on_dag(dag, n, seed=seed)
+                correct_neighbours = [neighbour["name"] for neighbour in learnt.get_node(0).neighbors() if dag.are_neighbours(0, dag.get_node_index(neighbour["name"]))]
+                inner_learnt_degrees.append(len(correct_neighbours))
+            learnt_degree_means.append(np.median(inner_learnt_degrees))
+            learnt_degree_upperq.append(np.quantile(inner_learnt_degrees, 0.75))
+            learnt_degree_lowerq.append(np.quantile(inner_learnt_degrees, 0.25))
+        plt.plot(true_indegrees, learnt_degree_means, label=f"n = {n}")
+        plt.fill_between(true_indegrees, learnt_degree_lowerq, learnt_degree_upperq, alpha=0.3)
+    plt.xlabel("Ground truth DAG, node A in-degree")
+    plt.ylabel("Learnt DAG, node A degree")
+    plt.legend()
+    plt.show()
+    # dag = linear_dist_dag(15, 6, seed=0)
     # dag.plot()
-    # print(in_degrees)
-    # print(sorted(in_degrees))
-    # plt.scatter(in_degrees, learnt_neighbours)
-    # plt.show()
-    dag = linear_dist_dag(15, 6, seed=2)
-    dag.plot()
+    # learnt = sl_on_dag(dag, 400, seed=0)
+    # dag.compare(learnt).plot()
+
